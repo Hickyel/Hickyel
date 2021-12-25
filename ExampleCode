@@ -1,0 +1,219 @@
+local Engine = {}
+local Game
+local Workspace = {}
+setmetatable(Engine,Workspace)
+Engine.Workspace = {}
+local fps = 2
+local gravity = 0.05
+function Engine.SetGamePlace(Frame)
+	if Frame == nil then print("Error : Frame is null") return  end
+	if not Frame:IsA("Frame") then print("Error : "..typeof(Frame).."is not a Frame") return end
+	Game = Frame
+	local Place = {}
+	Place.__index = Place
+	Place.TAG_NAME = "Place"
+	Place.OPEN_TIME = 2	
+	setmetatable(Engine,Place)
+	Engine.Game = Frame
+end
+function Engine.Create_BGCOLOR()
+	if Game == nil then print("Error : Game is null| Set the game place with .SetGamePlace(Frame)")return end
+	for i,v in pairs(Game:GetChildren()) do
+		if v.Name == "Back_Ground" then 
+			v:Destroy() 
+			print("Back_Ground Find and Destroy cannot have more then one Back_Ground")
+		end
+	end
+	local Back_Ground_Create = {}
+	--// Create Back ground
+	local Back_Ground = {}
+	Back_Ground.__index = Back_Ground
+	Back_Ground.TAG_NAME = "Back_Ground"
+	Back_Ground.OPEN_TIME = 2	
+	setmetatable(Engine,Back_Ground)
+	--// Create color properties
+	local Color = {}
+	Color.__index = Color
+	Color.TAG_NAME = "Color"
+	Color.OPEN_TIME = 2	
+	setmetatable(Back_Ground_Create,Color)
+	Back_Ground_Create.Color = Color3.fromRGB(0,0,0)
+	--// Create image properties
+	local Image = {}
+	Image.__index = Image
+	Image.TAG_NAME = "Image"
+	Image.OPEN_TIME = 2	
+	setmetatable(Back_Ground_Create,Image)
+	Back_Ground_Create.Image = nil
+	--// Put properties in back ground
+	Engine.Back_Ground = Back_Ground_Create
+end
+function Engine.SetGravity(Gravity)
+	if typeof(Gravity) ~= "number" then return end
+	gravity = Gravity
+end	
+function Engine.CreatePart(NameOfPart,Parent)
+	--//Create part 
+	local part = script.Parent.Parent.Stuff.Part:Clone()
+	part.Visible = true
+	part.Name = NameOfPart
+	local properties = require(part.Properties)
+	properties.Name = NameOfPart
+	part.Parent = Parent
+end
+function Engine:GetPartByName(Name)
+	local part 
+	if Game:FindFirstChild(Name) then
+		part = Game:FindFirstChild(Name)
+		return part
+	end
+end
+function Engine.CreateFPS()
+	if Game == nil then return end
+	if Game:FindFirstChild("FPS") then Game.FPS:Destroy() end
+	local fps = Instance.new("TextLabel")
+	fps.BackgroundTransparency = 1
+	fps.Parent = Game
+	fps.Size = UDim2.new(0.1,0,0.1,0)
+	fps.Name = "FPS"
+	local MaxFPS = {}
+	MaxFPS.__index = MaxFPS
+	MaxFPS.TAG_NAME = "FPS"
+	MaxFPS.OPEN_TIME = 2
+	MaxFPS.__type = "Number"
+	setmetatable(Engine,MaxFPS)
+	Engine.MaxFPS = 60
+end
+function Engine.SetMaxFPS(MaxFPS)
+	if typeof(MaxFPS) == "number" then
+		Engine.MaxFPS = MaxFPS
+	end
+end
+function Engine.Gravity_SetPos(Frame)
+	if not Frame:IsA("Frame") then return end
+	local properties = require(Frame.Properties)
+	properties.Velocity = Vector2.new(properties.Velocity.X,properties.Velocity.Y+gravity)
+	Engine.Velocity_SetPos(Frame)
+	--properties.Position = Vector2.new(properties.Position.X+properties.Velocity.X , properties.Position.Y+properties.Velocity.Y)
+end
+function Engine.Velocity_SetPos(Frame)
+	if not Frame:IsA("Frame") then return end
+	local properties = require(Frame.Properties)
+	properties.Position = Vector2.new(properties.Position.X+properties.Velocity.X+properties.Velocity.X , properties.Position.Y+properties.Velocity.Y)
+end
+function Engine.Collide_SetPos(Frame)
+	if not Frame:IsA("Frame") then return end
+	local properties = require(Frame.Properties)
+	local maxYPos1 = properties.Size.Y/2+properties.Position.Y
+	if maxYPos1 >= 100 then
+		properties.Position = Vector2.new(properties.Position.X,properties.Position.Y+(100-maxYPos1))
+		properties.Velocity = Vector2.new(properties.Velocity.X,0.1)
+	end
+	--[[local maxYPos2 = maxYPos1-properties.Size.Y
+	if maxYPos2 <= 0 then
+		properties.Position = Vector2.new(properties.Position.X,properties.Position.Y-(maxYPos2))
+		properties.Velocity = Vector2.new(0,properties.Velocity.Y)
+	end]]
+	local maxXPos1 = properties.Size.X/2+properties.Position.X
+	if maxXPos1 >= 100 then
+		properties.Position = Vector2.new(properties.Position.X+(100-maxXPos1),properties.Position.Y)
+		properties.Velocity = Vector2.new(0,properties.Velocity.Y)
+	end
+	local maxXPos2 = maxXPos1-properties.Size.X
+	if maxXPos2 <= 0 then
+		properties.Position = Vector2.new(properties.Position.X-(maxXPos2),properties.Position.Y)
+		properties.Velocity = Vector2.new(0,properties.Velocity.Y)
+	end
+	for i,v in pairs(Game:GetChildren()) do
+		if v ~= Frame then
+			if v:FindFirstChild("Properties") then
+				local proper = require(v.Properties)
+				if proper.Anchored == true and proper.CanCollide == true then
+					local maxPartYBottom = proper.Size.Y/2+proper.Position.Y
+					local maxPartYTop = maxPartYBottom-proper.Size.Y
+					local maxPartX1 = proper.Size.X/2+proper.Position.X
+					local maxPartX2 = maxPartX1-proper.Size.X
+					local PlatFormX = maxPartX1-maxPartX2
+					if maxYPos1 >= maxPartYTop and maxYPos1-properties.Size.X/2 < maxPartYTop then
+						if maxXPos2 < maxPartX1 and maxXPos1 > maxPartX2 then
+							properties.Position = Vector2.new(properties.Position.X,properties.Position.Y-(maxYPos1-maxPartYTop))
+							properties.Velocity = Vector2.new(properties.Velocity.X,0.1)
+							if script:FindFirstChild("Collision") then
+								local colision = script.Collision
+								colision:Fire(Frame,v)
+							else
+								local colision = Instance.new("BindableEvent",script)
+								colision.Name = "Collision"
+								wait(0.5)
+								colision:Fire(Frame,v)
+							end
+						end
+					end
+				elseif proper.Anchored == false and proper.CanCollide == true then
+					
+				end
+			end
+		end
+	end
+end
+function Engine.CreateCamera(Focus)
+	local camera = {}
+	
+end
+function Engine.UpdatePhysic()
+	if Game == nil then return end
+	for i,v in pairs(Game:GetChildren()) do
+		if v:FindFirstChild("Properties") then
+			local properties = require(v.Properties)
+			if properties.Anchored == false then
+				Engine.Gravity_SetPos(v)
+			end
+			if properties.CanCollide == true and properties.Anchored == false then
+				Engine.Collide_SetPos(v)
+			end
+		end
+	end
+end
+function Engine.UpdateGame()
+	if Game == nil then return end
+	if Engine.Back_Ground == nil then return end
+	--//Back ground
+	if Game:FindFirstChild("Back_Ground") then
+		local Back_Ground = Game.Back_Ground
+		Back_Ground.BackgroundColor3 = Engine.Back_Ground.Color
+	else
+		local Back_Ground = Instance.new("Frame",Game)
+		Back_Ground.Size = UDim2.new(1,0,1,0)
+		Back_Ground.Name = "Back_Ground"
+		Back_Ground.BackgroundColor3 = Engine.Back_Ground.Color
+	end
+	--//Fps
+	if Game:FindFirstChild("FPS") then
+		local fpsText = Game:FindFirstChild("FPS")
+		fpsText.Text = "FPS : "..fps*Engine.MaxFPS
+		if (Engine.Back_Ground.Color.r * Engine.Back_Ground.Color.g *Engine.Back_Ground.Color.b) < 0.09 then
+			fpsText.TextColor3 = Color3.fromRGB(255,255,255)
+		else
+			fpsText.TextColor3 = Color3.fromRGB(0,0,0)
+		end
+	end
+	--Part of game
+	for i,v in pairs(Game:GetChildren()) do
+		if v:FindFirstChild("Properties") then
+			local properties = require(v.Properties)
+			v.Size = UDim2.new(properties.Size.X/100,0,properties.Size.Y/100,0)
+			v.BackgroundColor3 = properties.Color
+			v.Position = UDim2.new(properties.Position.X/100,0,properties.Position.Y/100,0)
+		end
+	end
+end
+local countdown = false
+game:GetService("RunService").RenderStepped:Connect(function(Step)
+	if countdown == true then return end
+	countdown = true
+	fps = tostring(Step*60):sub(1,4)
+	Engine.UpdateGame()	
+	if Engine.MaxFPS == nil then else wait(1/Engine.MaxFPS) end
+	countdown = false
+end)
+return Engine
