@@ -1,0 +1,230 @@
+--// GLOBAL \\--
+WAIT = wait
+OS = os
+MATH = math
+PAIRS = pairs
+REQUIRE = require
+PRINT = print
+SPAWN = spawn
+INSTANCE = Instance
+VECTOR3 = Vector3
+PCALL = pcall
+STRING = string
+ENUM = Enum
+IPAIRS = ipairs
+GAME = game
+
+local PlayerService = {
+	Players = {}
+}
+
+--// Services \\--
+local Players = GAME:GetService("Players")
+local ReplicatedStorage = GAME:GetService("ReplicatedStorage")
+local MarketplaceService = GAME:GetService("MarketplaceService")
+local GroupService = GAME:GetService("GroupService")
+local ServerStorage = GAME:GetService("ServerStorage")
+local TweenService = GAME:GetService("TweenService")
+local Services = ServerStorage:WaitForChild("Services")
+local Events = ReplicatedStorage:WaitForChild("Events")
+local Services = ServerStorage:WaitForChild("Services")
+local Modules = ServerStorage:WaitForChild("Modules")
+local ServerScriptService = GAME:GetService("ServerScriptService")
+
+local ProfileService = REQUIRE(ServerScriptService:WaitForChild("ProfileService"))
+
+local Default =  {
+	TotalClick = 0;
+	TotalTimePlayed = 0;
+	IQ = 0;
+	SuperIQ = 0;
+	Coins = 0;
+	LastLog = 0;
+	LastLogGroup = 0;
+	DayPlayed = 0;
+	Pets = {}; --[ID] = {Equipped=false;Name="Name"}
+	Shop = {
+		Rebirth = 4;
+	};
+	Cube = 1;
+	EquippedCube = 1;
+}
+
+local ProfileStore = ProfileService.GetProfileStore(
+	"PlayerDataTEST",
+	Default
+)
+
+
+function PlayerService:Start()
+	CollisionService = REQUIRE(Services:WaitForChild('CollisionService'))
+	--NumToString = REQUIRE(Modules:WaitForChild('NumToString'))
+	DailyService = REQUIRE(Services:WaitForChild('DailyService'))
+	PetService = REQUIRE(Services:WaitForChild('PetService'))
+	ShopService = REQUIRE(Services:WaitForChild('ShopService'))
+	ClickService = REQUIRE(Services:WaitForChild('ClickService'))
+	
+	for _, player in IPAIRS(Players:GetPlayers()) do
+		PlayerService:AddPlayer(player)
+	end
+	Players.PlayerAdded:Connect(function(plr)
+		PlayerService:AddPlayer(plr)
+	end)	
+	Players.PlayerRemoving:Connect(function(plr)
+		PlayerService:RemovePlayer(plr)
+	end)
+end
+
+function PlayerService:RemovePlayer(plr)
+	local profile = PlayerService.Players[plr]
+	if profile ~= nil then
+		profile:Release()
+	end
+end
+
+function PlayerService:AddPlayer(plr)
+	local profile = ProfileStore:LoadProfileAsync("Player_" .. plr.UserId)
+	if profile ~= nil then
+		profile:AddUserId(plr.UserId)
+		profile:Reconcile() -- Fill in missing variables from ProfileTemplate (optional)
+		profile:ListenToRelease(function()
+			PlayerService.Players[plr] = nil
+			plr:Kick()
+		end)
+		if plr:IsDescendantOf(Players) == true then
+			PlayerService.Players[plr] = profile
+		else
+			profile:Release()
+		end
+	else
+		plr:Kick() 
+	end
+	if plr.Character then
+		PlayerService:CharacterAdded(plr)
+	end
+	plr.CharacterAdded:Connect(function(char)
+		PlayerService:CharacterAdded(plr)
+	end)
+	PlayerService:SetBase(plr)
+end
+
+function PlayerService:UpdateValueData(plr)
+	local lea = plr:FindFirstChild('leaderstats')
+	if lea then
+		local IQ = lea:FindFirstChild('IQ')
+		local SuperIQ = lea:FindFirstChild('SuperIQ')
+		if IQ then
+			local profil = PlayerService.Players[plr]
+			if profil then
+				local Data = profil.Data
+				if Data then
+					local GetNum = Data.IQ
+					if GetNum then
+						IQ.Value = GetNum
+					else
+						IQ.Value = Data.IQ
+					end
+					local GetNumS = Data.SuperIQ
+					if GetNumS then
+						SuperIQ.Value = GetNumS
+					else
+						SuperIQ.Value = Data.SuperIQ
+					end
+					local Shop = Data.Shop
+					if Shop then
+						ShopService:UpdateShopDataToClient(plr,Shop,GetNumS)
+					end
+				end
+			end
+		end
+	end
+end
+
+function PlayerService:SetBase(plr)
+	local leader = INSTANCE.new("Folder")
+	leader.Name = "leaderstats"
+	leader.Parent = plr
+	local IQ = INSTANCE.new("StringValue")
+	IQ.Name = "IQ"
+	IQ.Parent = leader
+	IQ.Value = 0
+	local SuperIQ = INSTANCE.new('StringValue')
+	SuperIQ.Name = 'SuperIQ'
+	SuperIQ.Parent = leader
+	SuperIQ.Value = 0
+	PlayerService:UpdateValueData(plr)
+	DailyService:CheckDaily(plr)
+	PetService:UpdateAllClientSide()
+end
+
+function PlayerService:GetData(plr)
+	if PlayerService.Players[plr] then
+		if PlayerService.Players[plr].Data then
+			return PlayerService.Players[plr].Data
+		end
+	end
+	return false
+end
+function PlayerService:SetData(plr,Index,Value,Sub)
+	if PlayerService.Players[plr] then
+		local Data = PlayerService.Players[plr].Data
+		if Data then
+			local Ind = Data[Index]
+			if Ind then
+				if Sub == nil then
+					PlayerService.Players[plr].Data[Index] = Value
+				elseif Sub == '+' then
+					PlayerService.Players[plr].Data[Index] += Value
+				elseif Sub == '-' then
+					PlayerService.Players[plr].Data[Index] -= Value
+				end
+				PlayerService:UpdateValueData(plr)
+			end
+		end
+	end
+end
+local OwnerSpawn = {}
+function PlayerService:CharacterAdded(plr)
+	repeat WAIT() until plr.Character
+	local Character = plr.Character
+	if Character then
+		wait()
+		CollisionService:SetCollisionGroup(Character,"Players")
+	end
+	if Character:FindFirstChild("Humanoid") then
+		Character.Humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	end
+	
+	--PlayerService:SetBasePlayerClientSide(plr)
+	ClickService:CreateCubeAccesory(plr)
+	PlayerService:UpdateValueData(plr)
+end
+
+--[[function PlayerService:SetBaseDataPlayerClient(plr)
+	local DataGet = PlayerService:GetData(plr)
+	if DataGet then
+		
+	end
+end]]
+
+function PlayerService:SetBasePlayerClientSide(plr)
+
+end
+
+
+SPAWN(function()
+	while WAIT(10) do
+		for pos,plr in PAIRS(Players:GetPlayers()) do
+			if PlayerService.Players[plr] == nil then
+				local CurrentData = ProfileStore:ViewProfileAsync("Player_" .. plr.UserId)
+				if CurrentData then
+					PlayerService.Players[plr] = CurrentData
+				else
+					plr:Kick("Problem With Connection")
+				end
+			end
+		end
+	end
+end)
+
+return PlayerService
